@@ -67,6 +67,7 @@ def sendFilesToServer( ftpServer, ftpUser, ftpPassword, hostname, files, mustCle
 
     ftp = Net::FTP.new( ftpServer )
     ftp.login ftpUser, ftpPassword
+    ftp.passive = true
 
     begin
         ftp.chdir( 'bak' )
