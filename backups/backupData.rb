@@ -60,11 +60,39 @@ def readConfigFile( configFile )
     return config
 end
 
-def sendFilesToServer( ftpServer, ftpUser, ftpPassword, hostname, files, mustCleanup )
+def sendFilesToServer( host, hostname, files, mustCleanup )
     now = Time.new
     year = now.year
     dayNumber = now.yday.to_s.rjust( 3, "0" )
+    if( host[ 'method' ] == 'ftp' )
+        sendFilesToServerByFtp( host[ 'server' ], host[ 'username' ], host[ 'password' ], hostname, files, year, dayNumber )
+    elsif( host[ 'method' ] == 'scp' )
+        sendFilesToServerByScp( host[ 'server' ], host[ 'username' ], host[ 'identity' ], host[ 'port' ], hostname, files, year, dayNumber )
+    end
+    if( mustCleanup )
+        puts "Cleaning up..."
+        files.each {
+            | file |
+            puts "Deleting #{file}."
+            FileUtils.rm( file )
+        }
+    end
+end
 
+def sendFilesToServerByScp( scpServer, scpUser, scpIdentity, scpPort, hostname, files, year, dayNumber )
+    path = "bak/#{hostname}/#{year}/#{dayNumber}"
+    makePathCommand = "ssh -p #{scpPort} -i #{scpIdentity} #{scpUser}@#{scpServer} \"mkdir -p #{path}\""
+    puts makePathCommand
+    system( makePathCommand )
+    files.each {
+        | file |
+        scpCommand = "scp -P #{scpPort} -i #{scpIdentity} #{file} #{scpUser}@#{scpServer}:#{path}/."
+        puts scpCommand
+        system( scpCommand )
+    }
+end
+
+def sendFilesToServerByFtp( ftpServer, ftpUser, ftpPassword, hostname, files, year, dayNumber )
     ftp = Net::FTP.new( ftpServer )
     ftp.login ftpUser, ftpPassword
     ftp.passive = true
@@ -109,7 +137,6 @@ def sendFilesToServer( ftpServer, ftpUser, ftpPassword, hostname, files, mustCle
         | file |
         dstFile = File.basename( file )
         ftp.putbinaryfile( file, dstFile )
-        FileUtils.rm( file ) if( mustCleanup )
     }
 
     ftp.close
@@ -173,11 +200,11 @@ encryptFiles( config[ 'encryptionKey' ],
             "#{file}.tar.gz"
         end
     } )
-config[ 'ftp' ].each_with_index {
-    | ftp, index |
-    puts "Sending file to #{ftp[ 'server' ]}..."
-    isLastElement = ( index == config[ 'ftp' ].size() - 1 )
-    sendFilesToServer( ftp[ 'server' ], ftp[ 'username' ], ftp[ 'password' ], config[ 'hostname' ],
+config[ 'host' ].each_with_index {
+    | host, index |
+    puts "Sending file to #{host[ 'server' ]}..."
+    isLastElement = ( index == config[ 'host' ].size() - 1 )
+    sendFilesToServer( host, config[ 'hostname' ],
         config[ 'filesToBackup' ].map {
             | file |
             if( config[ 'compressionProgram' ] == '7z' )

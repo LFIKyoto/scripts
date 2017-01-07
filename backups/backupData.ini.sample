@@ -1,0 +1,22 @@
+host1.method=scp
+host1.server=ip or host
+host1.username=backup
+host1.identity=~/.ssh/id_rsa
+host1.port=22
+
+host2.method=ftp
+host2.server=ip or host
+host2.username=backup
+host2.password=**********
+
+compressionProgram=
+encryptionKey=**********
+
+hostname=ip or host
+
+filesToBackup:BEGIN
+/tmp/all-databases.sql
+/etc
+/usr/local/sbin
+/var/www/html
+filesToBackup:END
