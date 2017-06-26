@@ -1,11 +1,12 @@
 #
 # Backup script
 # Written by Frederic Bergeron
-# (C) 2015
+# (C) 2015-2017
 #
 # Dependencies:
 # - GNU tar and gzip: http://gnuwin32.sourceforge.net/packages.html for Windows
 # - ccrypt: http://ccrypt.sourceforge.net for Windows
+# - gdcp: https://github.com/ctberthiaume/gdcp
 #
 
 require 'fileutils'
@@ -68,15 +69,53 @@ def sendFilesToServer( host, hostname, files, mustCleanup )
         sendFilesToServerByFtp( host[ 'server' ], host[ 'username' ], host[ 'password' ], hostname, files, year, dayNumber )
     elsif( host[ 'method' ] == 'scp' )
         sendFilesToServerByScp( host[ 'server' ], host[ 'username' ], host[ 'identity' ], host[ 'port' ], hostname, files, year, dayNumber )
+    elsif( host[ 'method' ] == 'gdcp' )
+        sendFilesToServerByGdcp( hostname, files, year, dayNumber )	
     end
     if( mustCleanup )
         puts "Cleaning up..."
         files.each {
             | file |
-            puts "Deleting #{file}."
-            FileUtils.rm( file )
+	    if File.exist?( file )  
+                puts "Deleting #{file}."
+		FileUtils.rm( file )
+            end
         }
     end
+end
+
+def sendFilesToServerByGdcp( hostname, files, year, dayNumber )
+    path = "/tmp/servers/#{hostname}/#{year}/#{dayNumber}"
+    makePathCommand = "mkdir -p #{path}"
+    puts makePathCommand
+    system( makePathCommand )
+
+    getServersFolderIdCommand = "PYTHONIOENCODING=utf-8 ~/gdcp-0.7.13/gdcp list | grep servers  | cut -f 2"
+    serversFolderId = `#{getServersFolderIdCommand}`
+    serversFolderId.chomp!
+
+    getHostnameFolderIdCommand = "PYTHONIOENCODING=utf-8 ~/gdcp-0.7.13/gdcp list -i #{serversFolderId} | grep #{hostname}  | cut -f 2"
+    hostnameFolderId = `#{getHostnameFolderIdCommand}`
+    hostnameFolderId.chomp!
+
+    getYearFolderIdCommand = "PYTHONIOENCODING=utf-8 ~/gdcp-0.7.13/gdcp list -i #{hostnameFolderId} | grep #{year}  | cut -f 2"
+    yearFolderId = `#{getYearFolderIdCommand}`
+    yearFolderId.chomp!
+	
+    files.each {
+        | file |
+        mvCommand = "mv #{file} #{path}/."
+        puts mvCommand
+        system( mvCommand )
+    }
+    uploadCommand = "cd /tmp/servers/#{hostname}/#{year} && ~/gdcp-0.7.13/gdcp upload -p #{yearFolderId} #{dayNumber}"
+    puts uploadCommand
+    system( uploadCommand )
+
+    puts "Cleaning up tmp files..."
+    rmCommand = "rm -rf /tmp/servers"
+    puts rmCommand
+    system( rmCommand )
 end
 
 def sendFilesToServerByScp( scpServer, scpUser, scpIdentity, scpPort, hostname, files, year, dayNumber )

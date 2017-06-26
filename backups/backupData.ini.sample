@@ -9,6 +9,11 @@ host2.server=ip or host
 host2.username=backup
 host2.password=**********
 
+host3.method=gdcp
+host3.server=
+host3.username=
+host3.password=
+
 compressionProgram=
 encryptionKey=**********
 
