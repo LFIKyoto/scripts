@@ -4,7 +4,7 @@
 # (C) 2015-2017
 #
 # Dependencies:
-# - GNU tar and gzip: http://gnuwin32.sourceforge.net/packages.html for Windows
+# - GNU tar, gzip, grep, coreutils, openssl: http://gnuwin32.sourceforge.net/packages.html for Windows
 # - ccrypt: http://ccrypt.sourceforge.net for Windows
 # - gdcp: https://github.com/ctberthiaume/gdcp
 #
@@ -76,9 +76,9 @@ def sendFilesToServer( host, hostname, files, mustCleanup )
         puts "Cleaning up..."
         files.each {
             | file |
-	    if File.exist?( file )  
+            if File.exist?( file )  
                 puts "Deleting #{file}."
-		FileUtils.rm( file )
+        	FileUtils.rm( file )
             end
         }
     end
@@ -86,35 +86,51 @@ end
 
 def sendFilesToServerByGdcp( hostname, files, year, dayNumber )
     path = "/tmp/servers/#{hostname}/#{year}/#{dayNumber}"
-    makePathCommand = "mkdir -p #{path}"
-    puts makePathCommand
-    system( makePathCommand )
+    FileUtils.mkdir_p(path)
 
-    getServersFolderIdCommand = "PYTHONIOENCODING=utf-8 ~/gdcp-0.7.13/gdcp list | grep servers  | cut -f 2"
+    if (getOS() == 'windows')
+	getServersFolderIdCommand = "c:\\gdcp.bat list | grep servers  | cut -f 2"
+    else
+        getServersFolderIdCommand = "PYTHONIOENCODING=utf-8 ~/gdcp-0.7.13/gdcp list | grep servers  | cut -f 2"
+    end 
     serversFolderId = `#{getServersFolderIdCommand}`
     serversFolderId.chomp!
 
-    getHostnameFolderIdCommand = "PYTHONIOENCODING=utf-8 ~/gdcp-0.7.13/gdcp list -i #{serversFolderId} | grep #{hostname}  | cut -f 2"
+    if (getOS() == 'windows')
+	getHostnameFolderIdCommand = "c:\\gdcp.bat \"list -i #{serversFolderId}\" | grep #{hostname}  | cut -f 2"
+    else
+        getHostnameFolderIdCommand = "PYTHONIOENCODING=utf-8 ~/gdcp-0.7.13/gdcp list -i #{serversFolderId} | grep #{hostname}  | cut -f 2"
+    end 
     hostnameFolderId = `#{getHostnameFolderIdCommand}`
     hostnameFolderId.chomp!
 
-    getYearFolderIdCommand = "PYTHONIOENCODING=utf-8 ~/gdcp-0.7.13/gdcp list -i #{hostnameFolderId} | grep #{year}  | cut -f 2"
+    if (getOS() == 'windows')
+	getYearFolderIdCommand = "c:\\gdcp.bat \"list -i #{hostnameFolderId}\" | grep #{year}  | cut -f 2"
+    else
+        getYearFolderIdCommand = "PYTHONIOENCODING=utf-8 ~/gdcp-0.7.13/gdcp list -i #{hostnameFolderId} | grep #{year}  | cut -f 2"
+    end 
     yearFolderId = `#{getYearFolderIdCommand}`
     yearFolderId.chomp!
-	
+
     files.each {
         | file |
-        mvCommand = "mv #{file} #{path}/."
-        puts mvCommand
+        if (getOS() == 'windows')
+            tmpFile = ENV['TMP'] + '/' + File.basename( "#{file}" )
+            mvCommand = "mv #{tmpFile} #{path}/."
+        else
+            mvCommand = "mv #{file} #{path}/."
+        end 
         system( mvCommand )
     }
-    uploadCommand = "cd /tmp/servers/#{hostname}/#{year} && ~/gdcp-0.7.13/gdcp upload -p #{yearFolderId} #{dayNumber}"
-    puts uploadCommand
+    if (getOS() == 'windows')
+        uploadCommand = "cd /tmp/servers/#{hostname}/#{year} && c:/gdcp.bat \"upload -p #{yearFolderId} #{dayNumber}\""
+    else
+        uploadCommand = "cd /tmp/servers/#{hostname}/#{year} && ~/gdcp-0.7.13/gdcp upload -p #{yearFolderId} #{dayNumber}"
+    end 
     system( uploadCommand )
 
     puts "Cleaning up tmp files..."
     rmCommand = "rm -rf /tmp/servers"
-    puts rmCommand
     system( rmCommand )
 end
 
@@ -185,15 +201,24 @@ def compressFiles( files, compressionProgram )
     prevDir = Dir.pwd
     files.each {
         | file |
+	puts "compressing file #{file}"
         Dir.chdir( File.dirname( file ) )
 
         src = File.basename( file )
         if( compressionProgram == '7z' )
-            outputFile = File.basename( "#{file}.7z" )
+	    if (getOS() == 'windows')
+	        outputFile = ENV['TMP'] + '/' + File.basename( "#{file}.7z" )
+	    else
+                outputFile = File.basename( "#{file}.7z" )
+	    end 
             command = "7z a -r \"#{outputFile}\" \"#{src}\""
             system( command )
         else
-            outputFile = File.basename( "#{file}.tar" )
+	    if (getOS() == 'windows')
+	        outputFile = ENV['TMP'] + '/' + File.basename( "#{file}.tar" )
+	    else
+	        outputFile = File.basename( "#{file}.tar" )
+	    end 
             command = "tar -cf \"#{outputFile}\" \"#{src}\""
             system( command )
 
@@ -207,7 +232,12 @@ end
 def encryptFiles( encryptionKey, files )
     files.each {
         | file |
-        command = "ccrypt --quiet --force --key \"#{encryptionKey}\" --encrypt \"#{file}\""
+        if (getOS() == 'windows')
+	    tmpFile = ENV['TMP'] + '/' + File.basename(file)
+            command = "ccrypt --quiet --force --key \"#{encryptionKey}\" --encrypt \"#{tmpFile}\""
+        else
+            command = "ccrypt --quiet --force --key \"#{encryptionKey}\" --encrypt \"#{file}\""
+        end 
         system( command )
     }
 end
@@ -232,7 +262,7 @@ config = readConfigFile( $configFile )
 compressFiles( config[ 'filesToBackup' ], config[ 'compressionProgram' ] )
 encryptFiles( config[ 'encryptionKey' ],
     config[ 'filesToBackup' ].map {
-        | file |
+       | file |
         if( config[ 'compressionProgram' ] == '7z' )
             "#{file}.7z"
         else
