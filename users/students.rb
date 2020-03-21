@@ -9,6 +9,10 @@ load 'credentials'
 
 cgi = CGI.new
 format = cgi['format']
+defaultGmailPassword = cgi['defaultGmailPassword']
+if defaultGmailPassword == ''
+    defaultGmailPassword = '********'
+end
 
 students = Hash.new
 
@@ -72,7 +76,7 @@ studentsByLevel = students.group_by { | k, v | v[ :level ] }
 		    row = "<tr><td>#{student[ 1 ][ :name ]}</td><td>#{student[ 1 ][ :login ]}@lfikyoto.org</td></tr>"
 		    print row
    		elsif format == 'gmail_bulk_upload'
-		    print "#{student[ 1 ][ :givenName ]},#{student[ 1 ][ :familyName ]},#{student[ 1 ][ :login ]}@lfikyoto.org,lfik-123456,,/Pedago/Eleves,,,,,,,,,,,,,,,,,,,,True,<br/>"
+		    print "#{student[ 1 ][ :givenName ]},#{student[ 1 ][ :familyName ]},#{student[ 1 ][ :login ]}@lfikyoto.org,#{defaultGmailPassword},,/Pedago/Eleves,,,,,,,,,,,,,,,,,,,,True,<br/>"
 		else
 		    colPasswordValue = ''
 	            if( $withPassword )
